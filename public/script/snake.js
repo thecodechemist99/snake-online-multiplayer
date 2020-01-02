@@ -8,7 +8,7 @@ Online multiplayer snake game.
 
 let socket;
 
-socket = io.connect("http://snake.florian-beck.de:80");
+socket = io.connect("http://snake.florian-beck.de:3000");
 socket.on("getid", getId);
 socket.on("getgrid", getGrid);
 socket.on("initgame", initGame);

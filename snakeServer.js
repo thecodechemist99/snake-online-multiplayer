@@ -11,7 +11,7 @@ Setup of socket server connection according to https://www.youtube.com/watch?v=i
 
 let express = require("express");
 let app = express();
-let server = app.listen(80);
+let server = app.listen(3000);
 app.use(express.static("public"));
 
 console.log("Socket server is running...");
