@@ -22,8 +22,7 @@ socket.on("dirchange", changeDir);
 let avgLatency = 0;
 let latencies = [];
 let sendTime = 0;
-let gameTime = new Date();
-function timeSync() {
+function getLatency() {
   if (sendTime != 0) {
     latencies.push(new Date().getTime() - sendTime);
   }
@@ -42,17 +41,10 @@ function timeSync() {
     }
     avgLatency = Math.round(sum / divider);
     console.log("The average latency is " + avgLatency + " ms.");
-    socket.emit("timesync");
   }
 }
 
-socket.on("latencyResponse", timeSync);
-socket.on("timesync", syncTime);
-
-function syncTime(timestamp) {
-  gameTime = Math.round(timestamp + avgLatency / 2);
-  console.log("The current game time is: " + gameTime);
-}
+socket.on("latencyResponse", getLatency);
 
 // calc median
 /* source: https://www.sitepoint.com/community/t/calculating-the-average-mean/7302/2 */
@@ -72,6 +64,36 @@ function median(numbers) {
   return median;
 }
 
+// sync game time with server
+
+function syncTime() {
+  socket.emit("timesync");
+}
+
+socket.on("timesync", syncTimeResponse);
+
+function syncTimeResponse(timestamp) {
+  game.time = timestamp + Math.round(avgLatency / 20) * 10;
+  console.log("The current game time is: " + game.time);
+}
+
+// calc game time
+function calcGameTime() {
+  if (game.run) {
+    // increase game time every 1 ms
+    setTimeout(function() {
+      game.time++;
+      calcGameTime();
+      move();
+    }, 1);
+
+    // sync game time once a second
+    if (game.time % 1000 === 0) {
+      syncTime();
+    }
+  }
+}
+
 /* === game setup === */
 
 // get client id
@@ -79,7 +101,7 @@ let id;
 function getId(data) {
   id = data.id;
   console.log(id);
-  timeSync();
+  getLatency();
 }
 
 // get game init data
@@ -106,6 +128,9 @@ function initGame(data) {
 
   // exit waiting mode
   waiting = false;
+
+  // start game time
+  calcGameTime();
 }
 
 /* === Lobby === */
@@ -117,6 +142,8 @@ let counter = 0;
 
 /* === Game === */
 
+let endcardText;
+
 function draw() {
   drawField();
 
@@ -127,14 +154,16 @@ function draw() {
     drawSnake(me);
     drawSnake(player2);
     drawFruit();
-    if (game.count % 2 === 0) {
-      moveSnake(me, player2);
-      moveSnake(player2, me);
-    }
   } else {
     drawEndcard();
   }
-  game.count++;
+}
+
+function move() {
+  if (game.time % 10 === 0) {
+    moveSnake(me, player2);
+    moveSnake(player2, me);
+  }
 }
 
 function drawField() {
@@ -191,7 +220,6 @@ function drawEndcard() {
         waitingPoints += ".";
       }
     }
-
     text(
       waitingText + waitingPoints,
       grid.x + (grid.width * grid.fieldSize) / 2,
@@ -199,7 +227,7 @@ function drawEndcard() {
     );
   } else {
     text(
-      "You lost.\nClick to restart.",
+      endcardText + "Click to restart.",
       grid.x + (grid.width * grid.fieldSize) / 2,
       grid.y + (grid.height * grid.fieldSize) / 2
     );
@@ -235,31 +263,27 @@ function moveSnake(snake, opponent) {
     snake.y < 0 ||
     snake.y >= grid.height * grid.fieldSize
   ) {
-    game.run = false;
+    hit(snake);
   }
 
   // check for self hit
   for (let i = 0; i < snake.length - 1; i++) {
     if (snake.x === snake.body[i][0] && snake.y === snake.body[i][1]) {
-      game.run = false;
+      hit(snake);
     }
   }
 
   // check for opponent hit
   for (let i = 0; i < opponent.length; i++) {
     if (snake.x === opponent.body[i][0] && snake.y === opponent.body[i][1]) {
-      game.run = false;
+      hit(snake);
     }
   }
 
   // eat fruit
   if (snake.x === fruit.x && snake.y === fruit.y) {
-    snake.length++;
-    game.score += 5;
-    fruit = {
-      x: floor(random(0, grid.width)) * grid.fieldSize,
-      y: floor(random(0, grid.height)) * grid.fieldSize
-    };
+    let hitid = snake.id;
+    socket.emit("eatfruit", hitid);
   }
 }
 
@@ -308,6 +332,41 @@ function changeDir(data) {
 }
 
 /* === server communication === */
+
+socket.on("won", won);
+socket.on("lost", lost);
+socket.on("playerupdate", updatePlayer);
+socket.on("fruitupdate", updateFruit);
+
+function hit(snake) {
+  let hitid = snake.id;
+  socket.emit("hit", hitid);
+  if (snake.id === socket.id) {
+    lost();
+  } else {
+    won();
+  }
+}
+
+function won() {
+  game.run = false;
+  endcardText = "You won.\n";
+}
+
+function lost() {
+  game.run = false;
+  endcardText = "You lost.\n";
+}
+
+function updatePlayer(curPlayer) {
+  me.length = curPlayer.length;
+  me.score = curPlayer.score;
+}
+
+function updateFruit(data) {
+  fruit.x = data.x;
+  fruit.y = data.y;
+}
 
 // function mouseDragged() {
 //   let data = {

@@ -47,7 +47,15 @@ function newConnection(socket) {
 
   socket.on("timesync", sendTimestamp);
   function sendTimestamp() {
-    let timestamp = new Date().getTime();
+    let timestamp;
+    for (let i = 0; i < games.length; i++) {
+      for (let j = 0; j < 2; j++) {
+        if (games[i].player[j].id === socket.id) {
+          timestamp = games[i].time;
+          break;
+        }
+      }
+    }
     io.to(socket.id).emit("timesync", timestamp);
   }
 
@@ -82,6 +90,49 @@ function newConnection(socket) {
     socket.broadcast.emit("dirchange", data);
   }
 
+  // object hit
+  socket.on("hit", detectHit);
+
+  function detectHit(hitid) {
+    console.log("Player " + hitid + " hit an object.");
+    if (hitid === socket.id) {
+      io.to(socket.id).emit("lost");
+      for (let i = 0; i < games.length; i++) {
+        for (let j = 0; j < 2; j++) {
+          if (games[i].player[j].id != socket.id) {
+            io.to(games[i].player[j].id).emit("won");
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // eat fruit
+  socket.on("eatfruit", eatFruit);
+
+  function eatFruit(hitid) {
+    if (hitid === socket.id) {
+      for (let i = 0; i < games.length; i++) {
+        for (let j = 0; j < 2; j++) {
+          if (games[i].player[j].id === socket.id) {
+            // update player
+            let curPlayer = games[i].player[j];
+            curPlayer.length++;
+            curPlayer.score += 5;
+            io.to(socket.id).emit("playerupdate", curPlayer);
+
+            // update fruit
+            fruit.relocate(grid);
+            let data = fruit;
+            socket.emit("fruitupdate", data);
+            break;
+          }
+        }
+      }
+    }
+  }
+
   // reset game
   socket.on("reset", resetGame);
 
@@ -90,7 +141,15 @@ function newConnection(socket) {
     for (let i = 0; i < games.length; i++) {
       for (let j = 0; j < 2; j++) {
         if (games[i].player[j].id === socket.id) {
-          queue.push(games[i].player[j]);
+          // reset player object
+          let curPlayer = games[i].player[j];
+          curPlayer.length = 1;
+          curPlayer.score = 0;
+
+          io.to(socket.id).emit("playerupdate", curPlayer);
+
+          // put player into queue
+          queue.push(curPlayer);
           games[i].player.splice(j, 1);
 
           console.log("Player " + socket.id + " left the game.");
@@ -142,6 +201,18 @@ function newConnection(socket) {
 
     io.to(newGame.player[0].id).emit("initgame", data);
     io.to(newGame.player[1].id).emit("initgame", data);
+
+    // start time
+    calcGameTime(newGame);
+  }
+
+  // calc game time
+  function calcGameTime(game) {
+    // increase game time every 1 ms
+    setTimeout(function() {
+      game.time++;
+      calcGameTime(game);
+    }, 1);
   }
 
   //   socket.on("mouse", mouseMsg);

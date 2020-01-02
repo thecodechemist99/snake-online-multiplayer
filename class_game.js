@@ -4,10 +4,10 @@ Class for general game related information.
 */
 
 class Game {
-  constructor(player, run, count) {
+  constructor(player, run, time) {
     this.player = player;
     this.run = true;
-    this.count = 0;
+    this.time = 0;
   }
 }
 
