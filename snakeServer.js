@@ -13,13 +13,7 @@ and https://robdodson.me/deploying-your-first-node-dot-js-and-socket-dot-io-app-
 let express = require("express");
 let app = express();
 const port = process.env.PORT || 3000;
-let server = app.listen(port); //, () => {
-//   console.log(
-//     "Express server listening on port %d in %s mode",
-//     app.address().port,
-//     app.settings.env
-//   );
-// });
+let server = app.listen(port);
 app.use(express.static("public"));
 
 console.log("Socket server listening on port 3000 ...");
@@ -28,12 +22,6 @@ console.log("Socket server listening on port 3000 ...");
 
 let socket = require("socket.io");
 let io = socket(server);
-
-// // source: https://devcenter.heroku.com/articles/using-socket-io-with-node-js-on-heroku
-// io.configure(() => {
-//   io.set("transports", ["xhr-polling"]);
-//   io.set("polling duration", 10);
-// });
 
 /* === setup game === */
 
@@ -137,10 +125,10 @@ function newGame(socket) {
     timeGame(game);
   }, moveInt);
 
-  //   // reset game
-  //   socket.on("reset", () => {
-  //     resetGame(socket, game, playerIndex);
-  //   });
+  // reset game
+  socket.on("reset", id => {
+    resetGame(socket, game, id);
+  });
 
   /* movement */
 
@@ -166,38 +154,42 @@ function timeGame(game) {
   updatePlayer(game);
 }
 
-// function resetGame(socket, game, playerIndex) {
-//   // set vars
-//   if (game.player.length === 2) {
-//     let player = game.player[playerIndex];
-//   } else {
-//     player = game.player[0];
-//   }
+function resetGame(socket, game, playerId) {
+  // set vars
+  if (game.player.length === 2) {
+    if (playerId === game.player[0].id) {
+      let player = game.player[0];
+    } else {
+      let player = game.player[1];
+    }
+  } else {
+    player = game.player[0];
+  }
 
-//   // reset player object
-//   player.length = 1;
-//   player.score = 0;
-//   updatePlayer(socket, game);
+  // reset player object
+  player.length = 1;
+  player.score = 0;
+  updatePlayer(game);
 
-//   // put player back to queue
-//   queue.push(player);
-//   game.player.splice(playerIndex, 1);
+  // put player back to queue
+  queue.push(player);
+  game.player.splice(playerIndex, 1);
 
-//   console.log("Player " + player.id + " left the game.");
+  console.log("Player " + playerId + " left the game.");
 
-//   // delete game if both player left
-//   if (game.player.length === 0) {
-//     games.splice(game.index, 1);
+  // delete game if both player left
+  if (game.player.length === 0) {
+    games.splice(game.index, 1);
 
-//     console.log("Game deleted, both player left.");
-//   }
+    console.log("Game deleted, both player left.");
+  }
 
-//   console.log("Player " + player.id + " in queue.");
+  console.log("Player " + playerId + " in queue.");
 
-//   if (queue.length >= 2) {
-//     newGame(socket);
-//   }
-// }
+  if (queue.length >= 2) {
+    newGame(socket);
+  }
+}
 
 /* movement */
 

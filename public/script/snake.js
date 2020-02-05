@@ -132,10 +132,10 @@ socket.on("fruitupdate", data => {
 
 /* == lobby == */
 
-// let waiting = true;
-// let waitingText = "Waiting for second player \n";
-// let waitingPoints = "";
-// let counter = 0;
+let waiting = true;
+let waitingText = "Waiting for second player \n";
+let waitingPoints = "";
+let counter = 0;
 
 /* === game === */
 
@@ -173,8 +173,8 @@ function initGame(data) {
   game = data.game;
   fruit = data.fruit;
 
-  //   // exit waiting mode
-  //   waiting = false;
+  // exit waiting mode
+  waiting = false;
 
   // start game time (increase every 100 ms)
   gameTimer = setInterval(() => {
@@ -217,9 +217,9 @@ function draw() {
     drawSnake(me);
     drawSnake(opponent);
     drawFruit(grid.x + fruit.x, grid.y + fruit.y, grid.fieldSize);
-    //   } else {
-    //     drawEndcard();
-    //     if (waiting) counter++;
+  } else {
+    drawEndcard();
+    if (waiting) counter++;
   }
 }
 
@@ -270,32 +270,32 @@ function drawSnake(snake) {
   }
 }
 
-// function drawEndcard() {
-//   fill("#ffffff");
-//   textSize(40);
-//   textAlign(CENTER, CENTER);
+function drawEndcard() {
+  fill("#ffffff");
+  textSize(40);
+  textAlign(CENTER, CENTER);
 
-//   if (waiting) {
-//     if (counter % 20 === 0) {
-//       if (waitingPoints === "...") {
-//         waitingPoints = "";
-//       } else {
-//         waitingPoints += ".";
-//       }
-//     }
-//     text(
-//       waitingText + waitingPoints,
-//       grid.x + (grid.width * grid.fieldSize) / 2,
-//       grid.y + (grid.height * grid.fieldSize) / 2
-//     );
-//   } else {
-//     text(
-//       endcardText + "Click to restart.",
-//       grid.x + (grid.width * grid.fieldSize) / 2,
-//       grid.y + (grid.height * grid.fieldSize) / 2
-//     );
-//   }
-// }
+  if (waiting) {
+    if (counter % 10 === 0) {
+      if (waitingPoints === "...") {
+        waitingPoints = "";
+      } else {
+        waitingPoints += ".";
+      }
+    }
+    text(
+      waitingText + waitingPoints,
+      grid.x + (grid.width * grid.fieldSize) / 2,
+      grid.y + (grid.height * grid.fieldSize) / 2
+    );
+  } else {
+    text(
+      endcardText + "Click to restart.",
+      grid.x + (grid.width * grid.fieldSize) / 2,
+      grid.y + (grid.height * grid.fieldSize) / 2
+    );
+  }
+}
 
 /* == movement == */
 
@@ -450,9 +450,10 @@ function keyPressed() {
   }
 
   if (!game.run && !waiting) {
-    // // check for key input to restart
-    // socket.emit("reset");
-    // waiting = true;
+    // check for key input to restart
+    let id = me.id;
+    socket.emit("reset", id);
+    waiting = true;
   } else {
     // send new direction to server
     let data = {
@@ -469,13 +470,13 @@ function keyPressed() {
   }
 }
 
-// function mousePressed() {
-//   // check for mouse input to restart
-//   if (!game.run && !waiting) {
-//     socket.emit("reset");
-//     waiting = true;
-//   }
-// }
+function mousePressed() {
+  // check for mouse input to restart
+  if (!game.run && !waiting) {
+    socket.emit("reset");
+    waiting = true;
+  }
+}
 
 /* === graphics === */
 
