@@ -143,6 +143,9 @@ function timeGame(game) {
   // calc snake movement
   calcSnakeMovement(game, game.player[0]);
   calcSnakeMovement(game, game.player[1]);
+
+  // update player
+  updatePlayer(game);
 }
 
 function resetGame(socket, game, playerId) {
