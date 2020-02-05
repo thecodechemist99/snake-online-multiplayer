@@ -1,12 +1,13 @@
 /* setup file for p5.js */
 
 function setup() {
-  createCanvas(windowWidth, windowHeight);
+  let screen = createCanvas(960, 680);
+  screen.parent("screen");
   frameRate(30);
 }
 
 function resizeHandler() {
-  resizeCanvas(windowWidth, windowHeight);
+  resizeCanvas(960, 680);
   clear();
 }
 

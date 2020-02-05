@@ -2,4 +2,26 @@ body {
   margin: 0px;
   padding: 0px;
   overflow: hidden;
+
+  background: #ababab;
+}
+
+#arcade {
+  width: 1060px;
+  margin: 0px auto;
+
+  background-image: url(../images/arcade.svg);
+  background-repeat: no-repeat;
+  /* background-size: 100%; */
+}
+
+#screen {
+  position: absolute;
+  top: 140px;
+  left: calc((100vw - 1050px) / 2 + 45px);
+
+  margin: 0px auto;
+  width: 960;
+  height: 680px;
+  margin-top: 100px;
 }

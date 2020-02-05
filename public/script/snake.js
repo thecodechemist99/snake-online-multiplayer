@@ -17,7 +17,7 @@ let intervalCount = 0;
 
 let socket;
 let socketId;
-socket = io.connect("https://snake-online-multiplayer.herokuapp.com");
+socket = io.connect("https://snake-online-multiplayer.herokuapp.com/");
 
 socket.on("sendid", getClientId);
 
@@ -25,7 +25,7 @@ function getClientId(id) {
   socketId = id;
 
   console.log(
-    "You have successfully been connected to the server at https://snake-online-multiplayer.herokuapp.com.\nYour player ID is " +
+    "You have successfully been connected to the server at http://localhost:3000.\nYour player ID is " +
       socketId +
       "."
   );
@@ -275,7 +275,7 @@ function drawSnake(snake) {
 }
 
 function drawEndcard() {
-  fill("#ffffff");
+  fill("#dadada");
   textSize(40);
   textAlign(CENTER, CENTER);
 
