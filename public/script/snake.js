@@ -4,8 +4,8 @@ Online multiplayer snake game client.
 */
 
 /* implement testmode */
-let testing = true;
-let botMove = true;
+let testing = false;
+let botMove = false;
 let changeDirInt = 1000;
 
 // timing correction

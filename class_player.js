@@ -9,7 +9,7 @@ class Player {
     this.x = x;
     this.y = y;
     this.body = [];
-    this.length = 50;
+    this.length = 1;
     this.moveDir = Math.floor(Math.random(4));
     this.score = 0;
   }
