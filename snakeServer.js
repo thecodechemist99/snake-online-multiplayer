@@ -1,6 +1,6 @@
 /*
 Snake game online multiplayer server on Node.js.
-(c)2019 Florian Beck
+(c)2020 Florian Beck
 */
 
 /* 
@@ -14,17 +14,16 @@ let app = express();
 let server = app.listen(3000);
 app.use(express.static("public"));
 
-console.log("Socket server is running...");
+console.log("Socket server listening on port 3000 ...");
 
 /* === setup websocket connection === */
 
 let socket = require("socket.io");
 let io = socket(server);
-io.sockets.on("connection", newConnection);
 
 /* === setup game === */
 
-const grid = { x: 20, y: 50, width: 60, height: 40, fieldSize: 15 };
+const grid = { x: 30, y: 50, width: 60, height: 40, fieldSize: 15 };
 let queue = [];
 let games = [];
 
@@ -36,189 +35,316 @@ let fruit = new Fruit(
   (this.y = Math.floor(Math.random() * grid.height) * grid.fieldSize)
 );
 
-/* === handle data === */
+// movement intervall in ms
+let moveInt = 100;
+
+/* === handle connection data === */
+
+io.sockets.on("connection", newConnection);
 
 function newConnection(socket) {
-  // time sync
-  socket.on("latencyCheck", latencyResponse);
-  function latencyResponse() {
-    io.to(socket.id).emit("latencyResponse");
-  }
+  // join room
+  let room = "game-" + games.length;
+  socket.join(room);
 
-  socket.on("timesync", sendTimestamp);
-  function sendTimestamp() {
-    let timestamp;
-    for (let i = 0; i < games.length; i++) {
-      for (let j = 0; j < 2; j++) {
-        if (games[i].player[j].id === socket.id) {
-          timestamp = games[i].time;
-          break;
-        }
-      }
-    }
-    io.to(socket.id).emit("timesync", timestamp);
-  }
+  /* == general communication == */
+
+  // send socket id
+  let id = socket.id;
+  socket.emit("sendid", id);
+
+  // latency check response
+  socket.on("latencyCheck", () => {
+    socket.emit("latencyResponse");
+  });
+
+  /* == game based communication == */
+
+  // send grid to new player
+  let data = grid;
+  socket.emit("getgrid", data);
+
+  /* == player == */
 
   // add new player
   queue.push(
     new Player(
       (this.id = socket.id),
       (this.x = Math.floor(Math.random() * grid.width) * grid.fieldSize),
-      (this.y = Math.floor(Math.random() * grid.height) * grid.fieldSize),
-      (this.body = [[this.x, this.y]])
+      (this.y = Math.floor(Math.random() * grid.height) * grid.fieldSize)
     )
   );
-  let data = {
-    id: socket.id
-  };
-  io.to(socket.id).emit("getid", data);
-  console.log("New player with ID " + queue[queue.length - 1].id + " joined.");
 
-  // send grid to new player
-  data = grid;
-  io.to(socket.id).emit("getgrid", data);
+  console.log("New player with ID " + socket.id + " joined room " + room + ".");
 
   // create new game if 2 player in queue
   if (queue.length >= 2) {
-    newGame();
+    newGame(socket);
   }
+}
+
+/* == game == */
+
+function newGame(socket) {
+  // add last 2 player in queue to new game
+  let game = new Game(
+    (this.starttime = new Date().getTime()),
+    (this.player = [queue.shift(), queue.shift()])
+  );
+  games.push(game);
+  game.index = games.length - 1;
+
+  // set player vars
+  let player1 = game.player[0];
+  let player2 = game.player[1];
+
+  console.log(
+    "Player " + player1.id + " and player " + player2.id + " joined a new game."
+  );
+
+  // set start position values
+  player1.relocate(grid);
+  player2.relocate(grid);
+  fruit.relocate(grid);
+
+  // send initialization data to player
+  let data = {
+    game: game,
+    p1: player1,
+    p2: player2,
+    fruit: fruit
+  };
+
+  io.to(player1.id).emit("initgame", data);
+  io.to(player2.id).emit("initgame", data);
+
+  // start game time (increase every 100 ms)
+  game.gameTimer = setInterval(() => {
+    timeGame(game);
+  }, moveInt);
+
+  //   // reset game
+  //   socket.on("reset", () => {
+  //     resetGame(socket, game, playerIndex);
+  //   });
+
+  /* movement */
 
   // change direction
-  socket.on("keyinput", updateDir);
+  socket.on("keyinput", data => {
+    updateDir(game, data);
+  });
 
-  function updateDir(data) {
-    socket.broadcast.emit("dirchange", data);
+  //   /* hit events */
+
+  //   // object hit
+  //   socket.on("hit", () => {
+  //     detectHit(game);
+  //   });
+}
+
+function timeGame(game) {
+  // calc snake movement
+  calcSnakeMovement(game, game.player[0]);
+  calcSnakeMovement(game, game.player[1]);
+
+  // update player
+  updatePlayer(game);
+}
+
+// function resetGame(socket, game, playerIndex) {
+//   // set vars
+//   if (game.player.length === 2) {
+//     let player = game.player[playerIndex];
+//   } else {
+//     player = game.player[0];
+//   }
+
+//   // reset player object
+//   player.length = 1;
+//   player.score = 0;
+//   updatePlayer(socket, game);
+
+//   // put player back to queue
+//   queue.push(player);
+//   game.player.splice(playerIndex, 1);
+
+//   console.log("Player " + player.id + " left the game.");
+
+//   // delete game if both player left
+//   if (game.player.length === 0) {
+//     games.splice(game.index, 1);
+
+//     console.log("Game deleted, both player left.");
+//   }
+
+//   console.log("Player " + player.id + " in queue.");
+
+//   if (queue.length >= 2) {
+//     newGame(socket);
+//   }
+// }
+
+/* movement */
+
+function calcSnakeMovement(game, player) {
+  // add previous head position to body
+  player.body.push([player.x, player.y]);
+  if (player.body.length > player.length) {
+    player.body.shift();
   }
 
-  // object hit
-  socket.on("hit", detectHit);
+  // calc movement
+  let moveX = 0;
+  let moveY = 0;
 
-  function detectHit(hitid) {
-    console.log("Player " + hitid + " hit an object.");
-    if (hitid === socket.id) {
-      io.to(socket.id).emit("lost");
-      for (let i = 0; i < games.length; i++) {
-        for (let j = 0; j < 2; j++) {
-          if (games[i].player[j].id != socket.id) {
-            io.to(games[i].player[j].id).emit("won");
-            break;
-          }
-        }
-      }
-    }
+  switch (player.moveDir) {
+    case 0:
+      moveY = -grid.fieldSize;
+      break;
+    case 1:
+      moveX = grid.fieldSize;
+      break;
+    case 2:
+      moveY = grid.fieldSize;
+      break;
+    case 3:
+      moveX = -grid.fieldSize;
+      break;
   }
+
+  // apply movement
+  player.x += moveX;
+  player.y += moveY;
+
+  // // check for hits
+  // if (checkHits(game, player)) {
+  //   io.in("game-" + game.index).emit();
+  // }
 
   // eat fruit
-  socket.on("eatfruit", eatFruit);
+  if (player.x === fruit.x && player.y === fruit.y) {
+    eatFruit(game, player);
+  }
+}
 
-  function eatFruit(hitid) {
-    if (hitid === socket.id) {
-      for (let i = 0; i < games.length; i++) {
-        for (let j = 0; j < 2; j++) {
-          if (games[i].player[j].id === socket.id) {
-            // update player
-            let curPlayer = games[i].player[j];
-            curPlayer.length++;
-            curPlayer.score += 5;
-            io.to(socket.id).emit("playerupdate", curPlayer);
+// update direction
+function updateDir(game, data) {
+  let player1 = game.player[0];
+  let player2 = game.player[1];
+  let pDir;
 
-            // update fruit
-            fruit.relocate(grid);
-            let data = fruit;
-            socket.emit("fruitupdate", data);
-            break;
-          }
-        }
-      }
-    }
+  if (player1.id === data.id) {
+    correctMovement(game, player1, data);
+  } else {
+    correctMovement(game, player2, data);
   }
 
-  // reset game
-  socket.on("reset", resetGame);
+  updatePlayer(game);
+}
 
-  function resetGame() {
-    // put player back to queue
-    for (let i = 0; i < games.length; i++) {
-      for (let j = 0; j < 2; j++) {
-        if (games[i].player[j].id === socket.id) {
-          // reset player object
-          let curPlayer = games[i].player[j];
-          curPlayer.length = 1;
-          curPlayer.score = 0;
+function correctMovement(game, player, data) {
+  // get timestamp
+  let timestamp = new Date().getTime() - game.starttime;
+  // calc dir change
+  let newDir = data.dir;
+  // check for time offset
+  let timeDiff = timestamp - data.time;
+  let index = Math.abs(Math.ceil(timeDiff / moveInt));
+  if (timeDiff > moveInt) {
+    // correct movement
+    deleted = player.body.splice(player.body.length - index, index);
 
-          io.to(socket.id).emit("playerupdate", curPlayer);
+    player.x = player.body[player.body.length - 1][0];
+    player.y = player.body[player.body.length - 1][1];
+    player.body.pop();
 
-          // put player into queue
-          queue.push(curPlayer);
-          games[i].player.splice(j, 1);
+    // apply dir change
+    player.moveDir = newDir;
 
-          console.log("Player " + socket.id + " left the game.");
-
-          // delete game if both player left
-          if (games[i].player.length === 0) {
-            games.splice(i, 1);
-
-            console.log("Game deleted, both player left.");
-          }
-          break;
-        }
-      }
+    for (let i = 0; i < index + 1; i++) {
+      calcSnakeMovement(game, player);
+    }
+  } else if (timeDiff < -moveInt) {
+    for (let i = 0; i < index + 1; i++) {
+      calcSnakeMovement(game, player);
+      added.push(player.body[player.body.length - 1]);
     }
 
-    for (let i = 0; i < queue.length; i++) {
-      console.log("Player " + queue[i].id + " in queue.");
-    }
-
-    if (queue.length >= 2) {
-      newGame();
-    }
+    // apply dir change
+    player.moveDir = newDir;
+  } else {
+    // apply dir change
+    player.moveDir = newDir;
   }
+}
 
-  function newGame() {
-    let newGame = new Game((this.player = [queue.shift(), queue.shift()]));
-    games.push(newGame);
-
-    console.log(
-      "Player " +
-        newGame.player[0].id +
-        " and player " +
-        newGame.player[1].id +
-        " joined a new game."
-    );
-
-    // set new start values
-    fruit.relocate(grid);
-    newGame.player[0].relocate(grid);
-    newGame.player[1].relocate(grid);
-
-    // send initialization data to player
-    let data = {
-      game: newGame,
-      p1: newGame.player[0],
-      p2: newGame.player[1],
-      fruit: fruit
-    };
-
-    io.to(newGame.player[0].id).emit("initgame", data);
-    io.to(newGame.player[1].id).emit("initgame", data);
-
-    // start time
-    calcGameTime(newGame);
+function checkHits(game, player) {
+  if (
+    // check for borders
+    player.x < 0 ||
+    player.x >= grid.width * grid.fieldSize ||
+    player.y < 0 ||
+    player.y >= grid.height * grid.fieldSize ||
+    // check for snake hit
+    game.player[0].body.includes([player.x, player.y]) ||
+    game.player[1].body.includes([player.x, player.y])
+  ) {
+    return true;
+  } else {
+    return false;
   }
+}
 
-  // calc game time
-  function calcGameTime(game) {
-    // increase game time every 1 ms
-    setTimeout(function() {
-      game.time++;
-      calcGameTime(game);
-    }, 1);
-  }
+/* hit events */
 
-  //   socket.on("mouse", mouseMsg);
+// // detect hit
+// function detectHit(game, hitid) {
+//   // set vars
+//   let player1 = game.player[0];
+//   let player2 = game.player[1];
 
-  //   function mouseMsg(data) {
-  //     socket.broadcast.emit("mouse", data);
-  //     console.log(data);
-  //   }
+//   if (game.run) {
+//     console.log("Player " + hitid + " hit an object.");
+
+//     // update player
+//     if (player1.id === hitid) {
+//       io.to(player1.id).emit("lost");
+//       io.to(player2.id).emit("won");
+//     } else {
+//       io.to(player1.id).emit("won");
+//       io.to(player2.id).emit("lost");
+//     }
+
+//     // clear timer
+//     clearInterval(game.gameTimer);
+
+//     // stop game
+//     game.run = false;
+//   }
+// }
+
+// eat fruit
+function eatFruit(game, player) {
+  // update player
+  player.length++;
+  player.score += 5;
+  updatePlayer(game);
+
+  // update fruit
+  fruit.relocate(grid);
+  let data = fruit;
+  io.in("game-" + game.index).emit("fruitupdate", data);
+}
+
+/* == emit data == */
+
+function updatePlayer(game) {
+  let curTimestamp = new Date().getTime() - game.starttime;
+  let data = {
+    p1: game.player[0],
+    p2: game.player[1],
+    timestamp: curTimestamp - (curTimestamp % moveInt)
+  };
+  io.in("game-" + game.index).emit("playerupdate", data);
 }

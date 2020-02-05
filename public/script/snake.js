@@ -1,29 +1,49 @@
 /*
-Online multiplayer snake game.
-(c)2019 Florian Beck
+Online multiplayer snake game client.
+(c)2020 Florian Beck
 */
 
-/* === socket server setup ===*/
-/*  Setup of socket server connection according to https://www.youtube.com/watch?v=i6eP1Lw4gZk. */
+/* implement testmode */
+let testing = true;
+let botMove = true;
+let changeDirInt = 1000;
+
+// timing correction
+let lastMove = 0;
+let lastDirChange = 0;
+let intervalCount = 0;
+
+/* === connect to socket server === */
 
 let socket;
+let socketId;
+socket = io.connect("http://localhost:3000");
 
-socket = io.connect("http://snake.florian-beck.de:3000");
-socket.on("getid", getId);
-socket.on("getgrid", getGrid);
-socket.on("initgame", initGame);
-socket.on("dirchange", changeDir);
+socket.on("sendid", getClientId);
 
-/* === time sync === */
+function getClientId(id) {
+  socketId = id;
+
+  console.log(
+    "You have successfully been connected to the server at http://localhost:3000.\nYour player ID is " +
+      socketId +
+      "."
+  );
+}
+
+/* === general communication === */
+
+/* == latency == */
 
 // check latency
-/* logic based on "Actionscript for Multiplayer Games and Virtual Worlds", Jobe Makar, New Riders, 2010, pages 100ff */
+// logic based on "Actionscript for Multiplayer Games and Virtual Worlds", Jobe Makar, New Riders, 2010, pages 100ff
 
-let avgLatency = 0;
-let latencies = [];
 let sendTime = 0;
+let latencies = [];
+let avgLatency = 0;
+
 function getLatency() {
-  if (sendTime != 0) {
+  if (sendTime !== 0) {
     latencies.push(new Date().getTime() - sendTime);
   }
   if (latencies.length < 10) {
@@ -40,6 +60,9 @@ function getLatency() {
       }
     }
     avgLatency = Math.round(sum / divider);
+    latencies = [];
+    sendTime = 0;
+
     console.log("The average latency is " + avgLatency + " ms.");
   }
 }
@@ -47,245 +70,363 @@ function getLatency() {
 socket.on("latencyResponse", getLatency);
 
 // calc median
-/* source: https://www.sitepoint.com/community/t/calculating-the-average-mean/7302/2 */
+// source: https://www.sitepoint.com/community/t/calculating-the-average-mean/7302/2
+
 function median(numbers) {
-  var median = 0,
-    numsLen = numbers.length;
+  let median = 0;
+  let numsLen = numbers.length;
   numbers.sort();
+
   if (numsLen % 2 === 0) {
-    // is even
     // average of two middle numbers
     median = (numbers[numsLen / 2 - 1] + numbers[numsLen / 2]) / 2;
   } else {
-    // is odd
     // middle number only
     median = numbers[(numsLen - 1) / 2];
   }
   return median;
 }
 
-// sync game time with server
+/* === game based communication === */
 
-function syncTime() {
-  socket.emit("timesync");
-}
+// // game end
+// socket.on("won", won);
 
-socket.on("timesync", syncTimeResponse);
+// function won() {
+//   game.run = false;
+//   endcardText = "You won.\n";
+// }
 
-function syncTimeResponse(timestamp) {
-  game.time = timestamp + Math.round(avgLatency / 20) * 10;
-  console.log("The current game time is: " + game.time);
-}
+// socket.on("lost", lost);
 
-// calc game time
-function calcGameTime() {
-  if (game.run) {
-    // increase game time every 1 ms
-    setTimeout(function() {
-      game.time++;
-      calcGameTime();
-      move();
-    }, 1);
+// function lost() {
+//   // clear timer
+//   clearInterval(gameTimer);
 
-    // sync game time once a second
-    if (game.time % 1000 === 0) {
-      syncTime();
-    }
+//   // stop game
+//   game.run = false;
+//   endcardText = "You lost.\n";
+// }
+
+/* object updates */
+
+// update player
+socket.on("playerupdate", data => {
+  // update player
+  let player1 = data.p1;
+  let player2 = data.p2;
+
+  if (player1.id === socketId) {
+    me = player1;
+    opponent = player2;
+  } else {
+    me = player2;
+    opponent = player1;
   }
-}
+});
 
-/* === game setup === */
+// update fruit
+socket.on("fruitupdate", data => {
+  fruit = data;
+});
 
-// get client id
-let id;
-function getId(data) {
-  id = data.id;
-  console.log(id);
-  getLatency();
-}
+/* == lobby == */
 
-// get game init data
-let grid = new Object();
-function getGrid(data) {
+// let waiting = true;
+// let waitingText = "Waiting for second player \n";
+// let waitingPoints = "";
+// let counter = 0;
+
+/* === game === */
+
+// define objects
+let grid = {};
+let game = {};
+let me = {};
+let opponent = {};
+let fruit = {};
+
+/* == setup game == */
+
+let moveInt = 100;
+
+// get current latency
+getLatency();
+
+// get grid
+socket.on("getgrid", data => {
   grid = data;
-}
+});
 
-let me = new Object();
-let player2 = new Object();
-let game = new Object();
-let fruit = new Object();
+// initialize game
+socket.on("initgame", initGame);
+
 function initGame(data) {
-  if (data.p1.id === id) {
+  if (data.p1.id === socketId) {
     me = data.p1;
-    player2 = data.p2;
+    opponent = data.p2;
   } else {
     me = data.p2;
-    player2 = data.p1;
+    opponent = data.p1;
   }
 
   game = data.game;
   fruit = data.fruit;
 
-  // exit waiting mode
-  waiting = false;
+  //   // exit waiting mode
+  //   waiting = false;
 
-  // start game time
-  calcGameTime();
+  // start game time (increase every 100 ms)
+  gameTimer = setInterval(() => {
+    timeGame(me, opponent);
+  }, moveInt);
+
+  // testmode
+  if (testing) {
+    botMove = true;
+  }
 }
 
-/* === Lobby === */
+/* == general == */
 
-let waiting = true;
-let waitingText = "Waiting for second player \n";
-let waitingPoints = "";
-let counter = 0;
+function timeGame(me, opponent) {
+  // calc snake movement
+  moveSnake(me, opponent, game.starttime, true);
+  moveSnake(opponent, me, game.starttime, false);
 
-/* === Game === */
+  // testmode
+  if (botMove) {
+    intervalCount++;
+    if (intervalCount % (changeDirInt / moveInt) === 0) {
+      moveBot(game.starttime, me);
+    }
+  }
 
-let endcardText;
+  // check latency
+  getLatency();
+}
+
+/* == draw == */
+
+// let endcardText;
 
 function draw() {
   drawField();
 
-  if (waiting) {
-    drawEndcard();
-    counter++;
-  } else if (game.run) {
+  if (game.run) {
     drawSnake(me);
-    drawSnake(player2);
-    drawFruit();
-  } else {
-    drawEndcard();
-  }
-}
-
-function move() {
-  if (game.time % 10 === 0) {
-    moveSnake(me, player2);
-    moveSnake(player2, me);
+    drawSnake(opponent);
+    drawFruit(grid.x + fruit.x, grid.y + fruit.y, grid.fieldSize);
+    //   } else {
+    //     drawEndcard();
+    //     if (waiting) counter++;
   }
 }
 
 function drawField() {
+  // background
   background("#000000");
-  fill("#ffffff");
-  noStroke();
-  textFont("Courier", "monospace");
-  textAlign(LEFT, CENTER);
-  textSize(15);
-  text("Score: " + me.score, grid.x, grid.y / 2);
-  noFill();
-  stroke("#ffffff");
-  strokeWeight(2);
-  rect(
-    grid.x,
-    grid.y,
-    (grid.width + 0) * grid.fieldSize,
-    (grid.height + 0) * grid.fieldSize
+
+  // border
+  let borderStrength = 20;
+  drawBorder(
+    grid.x - borderStrength,
+    grid.y - borderStrength,
+    grid.width * grid.fieldSize + 2 * borderStrength,
+    grid.height * grid.fieldSize + 2 * borderStrength,
+    borderStrength
   );
+
+  // text
+  fill("#ff00ff");
   noStroke();
+  textFont("Courier");
+  textAlign(LEFT, CENTER);
+  textSize(20);
+  textStyle(BOLD);
+  if (game.run) {
+    text("Score: " + me.score, grid.x - borderStrength, grid.y / 3);
+    fill("#ffff00");
+    text("Opponent Score: " + opponent.score, grid.x + 120, grid.y / 3);
+  } else {
+    text("Score: 0", grid.x - borderStrength, grid.y / 3);
+    fill("#ffff00");
+    text("Opponent Score: 0", grid.x + 120, grid.y / 3);
+  }
 }
 
 function drawSnake(snake) {
-  if (snake.id === id) {
+  if (snake.id === me.id) {
     fill("#00ff00");
   } else {
     fill("#0000ff");
   }
   for (let i = 0; i < snake.body.length; i++) {
-    rect(
+    drawSnakeSegment(
       grid.x + snake.body[i][0],
       grid.y + snake.body[i][1],
-      grid.fieldSize,
       grid.fieldSize
     );
   }
 }
 
-function drawFruit() {
-  fill("#ff0000");
-  rect(grid.x + fruit.x, grid.y + fruit.y, grid.fieldSize, grid.fieldSize);
-}
+// function drawEndcard() {
+//   fill("#ffffff");
+//   textSize(40);
+//   textAlign(CENTER, CENTER);
 
-function drawEndcard() {
-  fill("#ffffff");
-  textSize(40);
-  textAlign(CENTER, CENTER);
+//   if (waiting) {
+//     if (counter % 20 === 0) {
+//       if (waitingPoints === "...") {
+//         waitingPoints = "";
+//       } else {
+//         waitingPoints += ".";
+//       }
+//     }
+//     text(
+//       waitingText + waitingPoints,
+//       grid.x + (grid.width * grid.fieldSize) / 2,
+//       grid.y + (grid.height * grid.fieldSize) / 2
+//     );
+//   } else {
+//     text(
+//       endcardText + "Click to restart.",
+//       grid.x + (grid.width * grid.fieldSize) / 2,
+//       grid.y + (grid.height * grid.fieldSize) / 2
+//     );
+//   }
+// }
 
-  if (waiting) {
-    if (counter % 20 === 0) {
-      if (waitingPoints === "...") {
-        waitingPoints = "";
-      } else {
-        waitingPoints += ".";
-      }
-    }
-    text(
-      waitingText + waitingPoints,
-      grid.x + (grid.width * grid.fieldSize) / 2,
-      grid.y + (grid.height * grid.fieldSize) / 2
-    );
-  } else {
-    text(
-      endcardText + "Click to restart.",
-      grid.x + (grid.width * grid.fieldSize) / 2,
-      grid.y + (grid.height * grid.fieldSize) / 2
-    );
-  }
-}
+/* == movement == */
 
-function moveSnake(snake, opponent) {
-  // move snake
-  switch (snake.moveDir) {
-    case 0:
-      snake.y -= grid.fieldSize;
-      break;
-    case 1:
-      snake.x += grid.fieldSize;
-      break;
-    case 2:
-      snake.y += grid.fieldSize;
-      break;
-    case 3:
-      snake.x -= grid.fieldSize;
-      break;
-  }
-  // save new position
+function moveSnake(snake, opponent, starttime, timestamp) {
+  // add previous head position to body
   snake.body.push([snake.x, snake.y]);
   if (snake.body.length > snake.length) {
     snake.body.shift();
   }
 
-  // check for borders
-  if (
-    snake.x < 0 ||
-    snake.x >= grid.width * grid.fieldSize ||
-    snake.y < 0 ||
-    snake.y >= grid.height * grid.fieldSize
-  ) {
-    hit(snake);
+  // save timestamp
+  if (timestamp === true) {
+    lastMove = new Date().getTime() - starttime;
   }
 
-  // check for self hit
-  for (let i = 0; i < snake.length - 1; i++) {
-    if (snake.x === snake.body[i][0] && snake.y === snake.body[i][1]) {
-      hit(snake);
-    }
+  // calc movement
+  let moveX = 0;
+  let moveY = 0;
+
+  switch (snake.moveDir) {
+    case 0:
+      moveY = -grid.fieldSize;
+      break;
+    case 1:
+      moveX = grid.fieldSize;
+      break;
+    case 2:
+      moveY = grid.fieldSize;
+      break;
+    case 3:
+      moveX = -grid.fieldSize;
+      break;
   }
 
-  // check for opponent hit
-  for (let i = 0; i < opponent.length; i++) {
-    if (snake.x === opponent.body[i][0] && snake.y === opponent.body[i][1]) {
-      hit(snake);
-    }
-  }
+  // apply movement
+  snake.x += moveX;
+  snake.y += moveY;
 
-  // eat fruit
-  if (snake.x === fruit.x && snake.y === fruit.y) {
-    let hitid = snake.id;
-    socket.emit("eatfruit", hitid);
-  }
+  //   // check for borders
+  //   if (
+  //     snake.x < 0 ||
+  //     snake.x >= grid.width * grid.fieldSize ||
+  //     snake.y < 0 ||
+  //     snake.y >= grid.height * grid.fieldSize
+  //   ) {
+  //     hit(snake);
+  //   }
+  //   // check for self hit
+  //   for (let i = 0; i < snake.length - 1; i++) {
+  //     if (snake.x === snake.body[i][0] && snake.y === snake.body[i][1]) {
+  //       hit(snake);
+  //     }
+  //   }
+  //   // check for opponent hit
+  //   for (let i = 0; i < opponent.length; i++) {
+  //     if (snake.x === opponent.body[i][0] && snake.y === opponent.body[i][1]) {
+  //       hit(snake);
+  //     }
+  //   }
+  //   // eat fruit
+  //   if (snake.x === fruit.x && snake.y === fruit.y) {
+  //     let hitid = snake.id;
+  //     socket.emit("eatfruit", hitid);
+  //   }
+  // }
+  // // object hit
+  // function hit(snake) {
+  //   let hitid = snake.id;
+  //   socket.emit("hit", hitid);
+  //   if (snake.id === me.id) {
+  //     lost();
+  //   } else {
+  //     won();
+  //   }
 }
+
+function moveBot(starttime, me) {
+  // get timestamp
+  let timestamp = new Date().getTime() - starttime;
+
+  // calc dir change
+  let newDir;
+
+  if (me.moveDir < 3) {
+    newDir = me.moveDir + 1;
+  } else {
+    newDir = 0;
+  }
+
+  // check for time offset
+  let timeDiff = timestamp - (lastDirChange + changeDirInt);
+  let index = abs(ceil(timeDiff / moveInt));
+  if (timeDiff > moveInt) {
+    // correct movement
+    deleted = me.body.splice(me.body.length - index, index);
+
+    me.x = me.body[me.body.length - 1][0];
+    me.y = me.body[me.body.length - 1][1];
+
+    me.body.pop();
+
+    // apply dir change
+    me.moveDir = newDir;
+
+    for (let i = 0; i < index + 1; i++) {
+      moveSnake(me, opponent, game.starttime, false);
+    }
+  } else if (timeDiff < -moveInt) {
+    for (let i = 0; i < index + 1; i++) {
+      moveSnake(me, opponent, game.starttime, false);
+      added.push(me.body[player.body.length - 1]);
+    }
+    // apply dir change
+    me.moveDir = newDir;
+  } else {
+    // apply dir change
+    me.moveDir = newDir;
+  }
+
+  let data = {
+    time: timestamp, //- (timestamp % 1000),
+    dir: me.moveDir
+  };
+
+  socket.emit("keyinput", data);
+
+  // save timestamp
+  lastDirChange = timestamp;
+}
+
+/* === user input === */
 
 function keyPressed() {
   // check for arrow or wasd key input
@@ -308,85 +449,192 @@ function keyPressed() {
       break;
   }
 
-  let data = me.moveDir;
-  socket.emit("keyinput", data);
-
-  // check for key input to restart
   if (!game.run && !waiting) {
-    socket.emit("reset");
-    waiting = true;
-  }
-}
-
-function mousePressed() {
-  // check for mouse input to restart
-  if (!game.run && !waiting) {
-    socket.emit("reset");
-    waiting = true;
-  }
-}
-
-/* === opponent control === */
-function changeDir(data) {
-  player2.moveDir = data;
-}
-
-/* === server communication === */
-
-socket.on("won", won);
-socket.on("lost", lost);
-socket.on("playerupdate", updatePlayer);
-socket.on("fruitupdate", updateFruit);
-
-function hit(snake) {
-  let hitid = snake.id;
-  socket.emit("hit", hitid);
-  if (snake.id === socket.id) {
-    lost();
+    // // check for key input to restart
+    // socket.emit("reset");
+    // waiting = true;
   } else {
-    won();
+    // send new direction to server
+    let data = {
+      id: me.id,
+      time: new Date().getTime() - game.starttime,
+      dir: me.moveDir
+    };
+    socket.emit("keyinput", data);
+
+    // testmode
+    if (testing) {
+      botMove = false;
+    }
   }
 }
 
-function won() {
-  game.run = false;
-  endcardText = "You won.\n";
-}
-
-function lost() {
-  game.run = false;
-  endcardText = "You lost.\n";
-}
-
-function updatePlayer(curPlayer) {
-  me.length = curPlayer.length;
-  me.score = curPlayer.score;
-}
-
-function updateFruit(data) {
-  fruit.x = data.x;
-  fruit.y = data.y;
-}
-
-// function mouseDragged() {
-//   let data = {
-//     x: mouseX,
-//     y: mouseY
-//   };
-
-//   socket.emit("mouse", data);
+// function mousePressed() {
+//   // check for mouse input to restart
+//   if (!game.run && !waiting) {
+//     socket.emit("reset");
+//     waiting = true;
+//   }
 // }
 
-// const http = require("http");
-// const WebSocketServer = require("websocket").server;
+/* === graphics === */
 
-// const server = http.createServer();
-// server.listen(9000);
+function drawSnakeSegment(xPos, yPos, size) {
+  let pixelSize = size / 15;
+  noStroke();
 
-// const wsServer = new WebSocketServer({
-//   httpServer: server
-// });
+  // top segment
+  rect(xPos + 6 * pixelSize, yPos, 3 * pixelSize, 4 * pixelSize);
 
-// wsServer.on("request", request => {
-//   const connection = request.accept(null, request.origin);
-// });
+  // bottom segment
+  rect(
+    xPos + 6 * pixelSize,
+    yPos + 11 * pixelSize,
+    3 * pixelSize,
+    4 * pixelSize
+  );
+
+  // left segments
+  rect(xPos, yPos + 5 * pixelSize, 2 * pixelSize, pixelSize);
+  rect(xPos, yPos + 7 * pixelSize, 3 * pixelSize, pixelSize);
+  rect(xPos, yPos + 9 * pixelSize, 2 * pixelSize, pixelSize);
+
+  // right segments
+  rect(xPos + 13 * pixelSize, yPos + 5 * pixelSize, 2 * pixelSize, pixelSize);
+  rect(xPos + 12 * pixelSize, yPos + 7 * pixelSize, 3 * pixelSize, pixelSize);
+  rect(xPos + 13 * pixelSize, yPos + 9 * pixelSize, 2 * pixelSize, pixelSize);
+
+  /* circle */
+  // top piece
+  rect(
+    xPos + 5 * pixelSize,
+    yPos + 4 * pixelSize,
+    5 * pixelSize,
+    2 * pixelSize
+  );
+  // bottom piece
+  rect(
+    xPos + 5 * pixelSize,
+    yPos + 9 * pixelSize,
+    5 * pixelSize,
+    2 * pixelSize
+  );
+
+  // left top
+  rect(
+    xPos + 4 * pixelSize,
+    yPos + 5 * pixelSize,
+    2 * pixelSize,
+    2 * pixelSize
+  );
+
+  // right top
+  rect(
+    xPos + 9 * pixelSize,
+    yPos + 5 * pixelSize,
+    2 * pixelSize,
+    2 * pixelSize
+  );
+
+  // right bottom
+  rect(
+    xPos + 9 * pixelSize,
+    yPos + 8 * pixelSize,
+    2 * pixelSize,
+    2 * pixelSize
+  );
+
+  // left bottom
+  rect(
+    xPos + 4 * pixelSize,
+    yPos + 8 * pixelSize,
+    2 * pixelSize,
+    2 * pixelSize
+  );
+
+  // left piece
+  rect(
+    xPos + 3 * pixelSize,
+    yPos + 6 * pixelSize,
+    2 * pixelSize,
+    3 * pixelSize
+  );
+
+  // right piece
+  rect(
+    xPos + 10 * pixelSize,
+    yPos + 6 * pixelSize,
+    2 * pixelSize,
+    3 * pixelSize
+  );
+}
+
+function drawBorder(xPos, yPos, xSize, ySize, strength) {
+  fill("#ffffff");
+  noStroke();
+
+  for (let i = 0; i < ySize; i++) {
+    for (let j = 0; j < xSize; j++) {
+      if (
+        i % 2 != 0 &&
+        j % 2 != 0 &&
+        (i <= strength ||
+          i >= ySize - strength ||
+          j <= strength ||
+          j >= xSize - strength)
+      ) {
+        rect(xPos + j, yPos + i, 1, 1);
+      }
+    }
+  }
+}
+
+function drawFruit(xPos, yPos, size) {
+  let pixelSize = size / 15;
+  fill("#ff0000");
+  noStroke();
+
+  /* border */
+  // top piece
+  rect(xPos + 2 * pixelSize, yPos, 11 * pixelSize, pixelSize);
+
+  // right piece
+  rect(xPos, yPos + 2 * pixelSize, pixelSize, 11 * pixelSize);
+
+  // bottom piece
+  rect(xPos + 2 * pixelSize, yPos + 14 * pixelSize, 11 * pixelSize, pixelSize);
+
+  // left piece
+  rect(xPos + 14 * pixelSize, yPos + 2 * pixelSize, pixelSize, 11 * pixelSize);
+
+  // top left
+  rect(xPos + pixelSize, yPos + pixelSize, pixelSize, pixelSize);
+
+  // top right
+  rect(xPos + 13 * pixelSize, yPos + pixelSize, pixelSize, pixelSize);
+
+  // bottom right
+  rect(xPos + 13 * pixelSize, yPos + 13 * pixelSize, pixelSize, pixelSize);
+
+  // bottom left
+  rect(xPos + pixelSize, yPos + 13 * pixelSize, pixelSize, pixelSize);
+
+  /* eyes */
+  rect(
+    xPos + 4 * pixelSize,
+    yPos + 3 * pixelSize,
+    2 * pixelSize,
+    2 * pixelSize
+  );
+  rect(
+    xPos + 9 * pixelSize,
+    yPos + 3 * pixelSize,
+    2 * pixelSize,
+    2 * pixelSize
+  );
+
+  /* mouth */
+  rect(xPos + 3 * pixelSize, yPos + 9 * pixelSize, 9 * pixelSize, pixelSize);
+  rect(xPos + 4 * pixelSize, yPos + 10 * pixelSize, 7 * pixelSize, pixelSize);
+  rect(xPos + 5 * pixelSize, yPos + 11 * pixelSize, 5 * pixelSize, pixelSize);
+}

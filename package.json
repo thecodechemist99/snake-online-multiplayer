@@ -1,11 +1,12 @@
 {
   "name": "snake-multiplayer-webserver",
   "version": "1.0.0",
-  "description": "Webserver for snake online multiplayer game.",
+  "description": "Snake online multiplayer game",
   "main": "snakeServer.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
+  "start": "node snakeServer.js",
   "author": "Florian Beck",
   "license": "ISC",
   "dependencies": {

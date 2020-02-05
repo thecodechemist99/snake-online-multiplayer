@@ -8,8 +8,8 @@ class Player {
     this.id = id;
     this.x = x;
     this.y = y;
-    this.body = body;
-    this.length = 1;
+    this.body = [];
+    this.length = 50;
     this.moveDir = Math.floor(Math.random(4));
     this.score = 0;
   }
