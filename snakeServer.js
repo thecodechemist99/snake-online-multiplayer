@@ -127,6 +127,7 @@ function newGame(socket) {
 
   // reset game
   socket.on("reset", id => {
+    console.log(id);
     resetGame(socket, game, id);
   });
 
@@ -136,27 +137,25 @@ function newGame(socket) {
   socket.on("keyinput", data => {
     updateDir(game, data);
   });
-
-  /* hit events */
 }
 
 function timeGame(game) {
   // calc snake movement
   calcSnakeMovement(game, game.player[0]);
   calcSnakeMovement(game, game.player[1]);
-
-  // update player
-  updatePlayer(game);
 }
 
 function resetGame(socket, game, playerId) {
   // set vars
+  let playerIndex;
+  let player;
   if (game.player.length === 2) {
     if (playerId === game.player[0].id) {
-      let player = game.player[0];
+      playerIndex = 0;
     } else {
-      let player = game.player[1];
+      playerIndex = 1;
     }
+    player = game.player[playerIndex];
   } else {
     player = game.player[0];
   }
@@ -219,9 +218,16 @@ function calcSnakeMovement(game, player) {
   player.y += moveY;
 
   // check for hits
-  if (checkHits(game, player)) {
-    io.to("game-" + game.index).emit("won");
-    io.to(player.id).emit("lost");
+  if (game.run) {
+    if (checkHits(game, player)) {
+      // emit events
+      io.to("game-" + game.index).emit("won");
+      io.to(player.id).emit("lost");
+
+      // stop game
+      game.run = false;
+      clearInterval(game.gameTimer);
+    }
   }
 
   // eat fruit
@@ -234,7 +240,6 @@ function calcSnakeMovement(game, player) {
 function updateDir(game, data) {
   let player1 = game.player[0];
   let player2 = game.player[1];
-  let pDir;
 
   if (player1.id === data.id) {
     correctMovement(game, player1, data);
@@ -286,9 +291,9 @@ function correctMovement(game, player, data) {
 function checkHits(game, player) {
   if (
     // check for borders
-    player.x < 0 ||
+    player.x < grid.x ||
     player.x >= grid.width * grid.fieldSize ||
-    player.y < 0 ||
+    player.y < grid.y ||
     player.y >= grid.height * grid.fieldSize ||
     // check for snake hit
     game.player[0].body.includes([player.x, player.y]) ||
@@ -315,11 +320,10 @@ function eatFruit(game, player) {
 /* == emit data == */
 
 function updatePlayer(game) {
-  let curTimestamp = new Date().getTime() - game.starttime;
   let data = {
     p1: game.player[0],
     p2: game.player[1],
-    timestamp: curTimestamp - (curTimestamp % moveInt)
+    timestamp: new Date().getTime() - game.starttime
   };
   io.in("game-" + game.index).emit("playerupdate", data);
 }

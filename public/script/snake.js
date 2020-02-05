@@ -17,7 +17,7 @@ let intervalCount = 0;
 
 let socket;
 let socketId;
-socket = io.connect("https://snake-online-multiplayer.herokuapp.com/");
+socket = io.connect("https://snake-online-multiplayer.herokuapp.com");
 
 socket.on("sendid", getClientId);
 
@@ -25,7 +25,7 @@ function getClientId(id) {
   socketId = id;
 
   console.log(
-    "You have successfully been connected to the server at http://localhost:3000.\nYour player ID is " +
+    "You have successfully been connected to the server at https://snake-online-multiplayer.herokuapp.com.\nYour player ID is " +
       socketId +
       "."
   );
@@ -456,6 +456,7 @@ function keyPressed() {
   if (!game.run && !waiting) {
     // check for key input to restart
     let id = me.id;
+    console.log("Reset ID: " + id);
     socket.emit("reset", id);
     waiting = true;
   } else {
@@ -477,7 +478,9 @@ function keyPressed() {
 function mousePressed() {
   // check for mouse input to restart
   if (!game.run && !waiting) {
-    socket.emit("reset");
+    let id = me.id;
+    console.log("Reset ID: " + id);
+    socket.emit("reset", id);
     waiting = true;
   }
 }
