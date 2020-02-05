@@ -13,13 +13,13 @@ and https://robdodson.me/deploying-your-first-node-dot-js-and-socket-dot-io-app-
 let express = require("express");
 let app = express();
 const port = process.env.PORT || 3000;
-let server = app.listen(port, () => {
-  console.log(
-    "Express server listening on port %d in %s mode",
-    app.address().port,
-    app.settings.env
-  );
-});
+let server = app.listen(port); //, () => {
+//   console.log(
+//     "Express server listening on port %d in %s mode",
+//     app.address().port,
+//     app.settings.env
+//   );
+// });
 app.use(express.static("public"));
 
 console.log("Socket server listening on port 3000 ...");
@@ -29,11 +29,11 @@ console.log("Socket server listening on port 3000 ...");
 let socket = require("socket.io");
 let io = socket(server);
 
-// source: https://devcenter.heroku.com/articles/using-socket-io-with-node-js-on-heroku
-io.configure(() => {
-  io.set("transports", ["xhr-polling"]);
-  io.set("polling duration", 10);
-});
+// // source: https://devcenter.heroku.com/articles/using-socket-io-with-node-js-on-heroku
+// io.configure(() => {
+//   io.set("transports", ["xhr-polling"]);
+//   io.set("polling duration", 10);
+// });
 
 /* === setup game === */
 

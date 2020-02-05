@@ -4,9 +4,9 @@
   "description": "Snake online multiplayer game",
   "main": "snakeServer.js",
   "scripts": {
+    "start": "node snakeServer",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "start": "node snakeServer.js",
   "author": "Florian Beck",
   "license": "ISC",
   "dependencies": {
