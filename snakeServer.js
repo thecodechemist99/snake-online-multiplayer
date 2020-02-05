@@ -11,7 +11,8 @@ Setup of socket server connection according to https://www.youtube.com/watch?v=i
 
 let express = require("express");
 let app = express();
-let server = app.listen(3000);
+const port = process.env.PORT || 3000;
+let server = app.listen(port);
 app.use(express.static("public"));
 
 console.log("Socket server listening on port 3000 ...");
