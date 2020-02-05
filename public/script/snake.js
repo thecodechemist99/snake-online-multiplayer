@@ -17,7 +17,7 @@ let intervalCount = 0;
 
 let socket;
 let socketId;
-socket = io.connect("http://localhost:3000");
+socket = io.connect("https://snake-online-multiplayer.herokuapp.com/");
 
 socket.on("sendid", getClientId);
 
