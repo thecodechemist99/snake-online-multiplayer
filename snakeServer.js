@@ -137,12 +137,7 @@ function newGame(socket) {
     updateDir(game, data);
   });
 
-  //   /* hit events */
-
-  //   // object hit
-  //   socket.on("hit", () => {
-  //     detectHit(game);
-  //   });
+  /* hit events */
 }
 
 function timeGame(game) {
@@ -223,10 +218,11 @@ function calcSnakeMovement(game, player) {
   player.x += moveX;
   player.y += moveY;
 
-  // // check for hits
-  // if (checkHits(game, player)) {
-  //   io.in("game-" + game.index).emit();
-  // }
+  // check for hits
+  if (checkHits(game, player)) {
+    io.to("game-" + game.index).emit("won");
+    io.to(player.id).emit("lost");
+  }
 
   // eat fruit
   if (player.x === fruit.x && player.y === fruit.y) {
@@ -285,6 +281,8 @@ function correctMovement(game, player, data) {
   }
 }
 
+/* hit events */
+
 function checkHits(game, player) {
   if (
     // check for borders
@@ -302,35 +300,6 @@ function checkHits(game, player) {
   }
 }
 
-/* hit events */
-
-// // detect hit
-// function detectHit(game, hitid) {
-//   // set vars
-//   let player1 = game.player[0];
-//   let player2 = game.player[1];
-
-//   if (game.run) {
-//     console.log("Player " + hitid + " hit an object.");
-
-//     // update player
-//     if (player1.id === hitid) {
-//       io.to(player1.id).emit("lost");
-//       io.to(player2.id).emit("won");
-//     } else {
-//       io.to(player1.id).emit("won");
-//       io.to(player2.id).emit("lost");
-//     }
-
-//     // clear timer
-//     clearInterval(game.gameTimer);
-
-//     // stop game
-//     game.run = false;
-//   }
-// }
-
-// eat fruit
 function eatFruit(game, player) {
   // update player
   player.length++;

@@ -89,24 +89,28 @@ function median(numbers) {
 
 /* === game based communication === */
 
-// // game end
-// socket.on("won", won);
+// end game
+socket.on("won", won);
 
-// function won() {
-//   game.run = false;
-//   endcardText = "You won.\n";
-// }
+function won() {
+  // clear timer
+  clearInterval(gameTimer);
 
-// socket.on("lost", lost);
+  // stop game
+  game.run = false;
+  endcardText = "You won.\n";
+}
 
-// function lost() {
-//   // clear timer
-//   clearInterval(gameTimer);
+socket.on("lost", lost);
 
-//   // stop game
-//   game.run = false;
-//   endcardText = "You lost.\n";
-// }
+function lost() {
+  // clear timer
+  clearInterval(gameTimer);
+
+  // stop game
+  game.run = false;
+  endcardText = "You lost.\n";
+}
 
 /* object updates */
 
