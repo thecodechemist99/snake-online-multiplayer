@@ -14,5 +14,5 @@ function resizeHandler() {
 window.addEventListener("resize", resizeHandler);
 
 new p5();
-var width = windowWidth;
-var height = windowHeight;
+var width = 960;
+var height = 600;

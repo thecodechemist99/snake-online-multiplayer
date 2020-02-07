@@ -3,21 +3,11 @@ Online multiplayer snake game client.
 (c)2020 Florian Beck
 */
 
-/* implement testmode */
-let testing = false;
-let botMove = false;
-let changeDirInt = 1000;
-
-// timing correction
-let lastMove = 0;
-let lastDirChange = 0;
-let intervalCount = 0;
-
 /* === connect to socket server === */
 
 let socket;
 let socketId;
-socket = io.connect("https://snake-online-multiplayer.herokuapp.com/");
+socket = io.connect("http://snake-online-multiplayer.herokuapp.com");
 
 socket.on("sendid", getClientId);
 
@@ -25,7 +15,7 @@ function getClientId(id) {
   socketId = id;
 
   console.log(
-    "You have successfully been connected to the server at http://localhost:3000.\nYour player ID is " +
+    "You have successfully been connected to the server at http://snake-online-multiplayer.herokuapp.com.\nYour player ID is " +
       socketId +
       "."
   );
@@ -127,7 +117,30 @@ socket.on("playerupdate", data => {
     me = player2;
     opponent = player1;
   }
+
+  // correct positions
+  correctPosition(me, data.time);
+  correctPosition(opponent, data.time);
 });
+
+function correctPosition(player, timestamp) {
+  // calc time offset
+  let gameTime = new Date().getTime() - game.starttime;
+  let timeDiff = gameTime - timestamp;
+
+  // correct movement
+  if (timeDiff > moveInt) {
+    let offset = floor(timeDiff / moveInt);
+
+    for (let i = 0; i < offset; i++) {
+      if (player === me) {
+        moveSnake(player, opponent, game.starttime, false);
+      } else {
+        moveSnake(player, me, game.starttime, false);
+      }
+    }
+  }
+}
 
 // update fruit
 socket.on("fruitupdate", data => {
@@ -184,11 +197,6 @@ function initGame(data) {
   gameTimer = setInterval(() => {
     timeGame(me, opponent);
   }, moveInt);
-
-  // testmode
-  if (testing) {
-    botMove = true;
-  }
 }
 
 /* == general == */
@@ -197,14 +205,6 @@ function timeGame(me, opponent) {
   // calc snake movement
   moveSnake(me, opponent, game.starttime, true);
   moveSnake(opponent, me, game.starttime, false);
-
-  // testmode
-  if (botMove) {
-    intervalCount++;
-    if (intervalCount % (changeDirInt / moveInt) === 0) {
-      moveBot(game.starttime, me);
-    }
-  }
 
   // check latency
   getLatency();
@@ -215,7 +215,7 @@ function timeGame(me, opponent) {
 // let endcardText;
 
 function draw() {
-  drawField();
+  background("#000000");
 
   if (game.run) {
     drawSnake(me);
@@ -225,11 +225,27 @@ function draw() {
     drawEndcard();
     if (waiting) counter++;
   }
+
+  drawField();
 }
 
 function drawField() {
-  // background
-  background("#000000");
+  // draw background for Border
+  fill("#000000");
+  rect(0, 0, grid.x, height);
+  rect(0, 0, width, grid.y);
+  rect(
+    0,
+    grid.y + grid.height * grid.fieldSize,
+    width,
+    height - (grid.y + grid.height * grid.fieldSize)
+  );
+  rect(
+    grid.x + grid.width * grid.fieldSize,
+    0,
+    width - (grid.x + grid.width * grid.fieldSize),
+    height
+  );
 
   // border
   let borderStrength = 20;
@@ -272,6 +288,7 @@ function drawSnake(snake) {
       grid.fieldSize
     );
   }
+  drawSnakeSegment(grid.x + snake.x, grid.y + snake.y, grid.fieldSize);
 }
 
 function drawEndcard() {
@@ -337,97 +354,6 @@ function moveSnake(snake, opponent, starttime, timestamp) {
   // apply movement
   snake.x += moveX;
   snake.y += moveY;
-
-  //   // check for borders
-  //   if (
-  //     snake.x < 0 ||
-  //     snake.x >= grid.width * grid.fieldSize ||
-  //     snake.y < 0 ||
-  //     snake.y >= grid.height * grid.fieldSize
-  //   ) {
-  //     hit(snake);
-  //   }
-  //   // check for self hit
-  //   for (let i = 0; i < snake.length - 1; i++) {
-  //     if (snake.x === snake.body[i][0] && snake.y === snake.body[i][1]) {
-  //       hit(snake);
-  //     }
-  //   }
-  //   // check for opponent hit
-  //   for (let i = 0; i < opponent.length; i++) {
-  //     if (snake.x === opponent.body[i][0] && snake.y === opponent.body[i][1]) {
-  //       hit(snake);
-  //     }
-  //   }
-  //   // eat fruit
-  //   if (snake.x === fruit.x && snake.y === fruit.y) {
-  //     let hitid = snake.id;
-  //     socket.emit("eatfruit", hitid);
-  //   }
-  // }
-  // // object hit
-  // function hit(snake) {
-  //   let hitid = snake.id;
-  //   socket.emit("hit", hitid);
-  //   if (snake.id === me.id) {
-  //     lost();
-  //   } else {
-  //     won();
-  //   }
-}
-
-function moveBot(starttime, me) {
-  // get timestamp
-  let timestamp = new Date().getTime() - starttime;
-
-  // calc dir change
-  let newDir;
-
-  if (me.moveDir < 3) {
-    newDir = me.moveDir + 1;
-  } else {
-    newDir = 0;
-  }
-
-  // check for time offset
-  let timeDiff = timestamp - (lastDirChange + changeDirInt);
-  let index = abs(ceil(timeDiff / moveInt));
-  if (timeDiff > moveInt) {
-    // correct movement
-    deleted = me.body.splice(me.body.length - index, index);
-
-    me.x = me.body[me.body.length - 1][0];
-    me.y = me.body[me.body.length - 1][1];
-
-    me.body.pop();
-
-    // apply dir change
-    me.moveDir = newDir;
-
-    for (let i = 0; i < index + 1; i++) {
-      moveSnake(me, opponent, game.starttime, false);
-    }
-  } else if (timeDiff < -moveInt) {
-    for (let i = 0; i < index + 1; i++) {
-      moveSnake(me, opponent, game.starttime, false);
-      added.push(me.body[player.body.length - 1]);
-    }
-    // apply dir change
-    me.moveDir = newDir;
-  } else {
-    // apply dir change
-    me.moveDir = newDir;
-  }
-
-  let data = {
-    time: timestamp, //- (timestamp % 1000),
-    dir: me.moveDir
-  };
-
-  socket.emit("keyinput", data);
-
-  // save timestamp
-  lastDirChange = timestamp;
 }
 
 /* === user input === */
@@ -467,11 +393,6 @@ function keyPressed() {
       dir: me.moveDir
     };
     socket.emit("keyinput", data);
-
-    // testmode
-    if (testing) {
-      botMove = false;
-    }
   }
 }
 

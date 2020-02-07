@@ -72,8 +72,12 @@ function newConnection(socket) {
   queue.push(
     new Player(
       (this.id = socket.id),
-      (this.x = Math.floor(Math.random() * grid.width) * grid.fieldSize),
-      (this.y = Math.floor(Math.random() * grid.height) * grid.fieldSize)
+      (this.x =
+        Math.floor(Math.random() * (grid.width / 2) + grid.width / 4) *
+        grid.fieldSize),
+      (this.y =
+        Math.floor(Math.random() * (grid.height / 2) + grid.height / 4) *
+        grid.fieldSize)
     )
   );
 
@@ -127,7 +131,8 @@ function newGame(socket) {
 
   // reset game
   socket.on("reset", id => {
-    console.log(id);
+    console.log("Player ID: " + id);
+    console.log("Socket ID: " + socket.id);
     resetGame(socket, game, id);
   });
 
@@ -148,45 +153,75 @@ function timeGame(game) {
   updatePlayer(game);
 }
 
-function resetGame(socket, game, playerId) {
-  // set vars
-  let playerIndex;
-  let player;
-  if (game.player.length === 2) {
-    if (playerId === game.player[0].id) {
-      playerIndex = 0;
-    } else {
-      playerIndex = 1;
-    }
-    player = game.player[playerIndex];
-  } else {
-    player = game.player[0];
-  }
+function resetGame(socket, game) {
+  let player1 = game.player[0];
+  let player2 = game.player[1];
 
-  // reset player object
-  player.length = 1;
-  player.score = 0;
+  // reset player objects
+  player1.length = 0;
+  player1.score = 0;
+  player2.length = 0;
+  player2.score = 0;
   updatePlayer(game);
 
   // put player back to queue
-  queue.push(player);
-  game.player.splice(playerIndex, 1);
+  queue.push(game.player.pop());
+  queue.push(game.player.pop());
 
-  console.log("Player " + playerId + " left the game.");
+  console.log("Player " + player1.id + " left the game.");
+  console.log("Player " + player2.id + " left the game.");
 
-  // delete game if both player left
-  if (game.player.length === 0) {
-    games.splice(game.index, 1);
+  // delete game as both player left
+  games.splice(game.index, 1);
+  console.log("Game deleted, both player left.");
 
-    console.log("Game deleted, both player left.");
-  }
-
-  console.log("Player " + playerId + " in queue.");
+  console.log("Player " + player1.id + " in queue.");
+  console.log("Player " + player2.id + " in queue.");
 
   if (queue.length >= 2) {
     newGame(socket);
   }
 }
+
+// function resetGame(socket, game, playerId) {
+//   // set vars
+//   let playerIndex;
+//   let player;
+//   if (game.player.length === 2) {
+//     if (playerId === game.player[0].id) {
+//       playerIndex = 0;
+//     } else {
+//       playerIndex = 1;
+//     }
+//     player = game.player[playerIndex];
+//   } else {
+//     player = game.player[0];
+//   }
+
+//   // reset player object
+//   player.length = 0;
+//   player.score = 0;
+//   updatePlayer(game);
+
+//   // put player back to queue
+//   queue.push(player);
+//   game.player.splice(playerIndex, 1);
+
+//   console.log("Player " + playerId + " left the game.");
+
+//   // delete game if both player left
+//   if (game.player.length === 0) {
+//     games.splice(game.index, 1);
+
+//     console.log("Game deleted, both player left.");
+//   }
+
+//   console.log("Player " + playerId + " in queue.");
+
+//   if (queue.length >= 2) {
+//     newGame(socket);
+//   }
+// }
 
 /* movement */
 
@@ -224,7 +259,13 @@ function calcSnakeMovement(game, player) {
   if (game.run) {
     if (checkHits(game, player)) {
       // emit events
-      io.to("game-" + game.index).emit("won");
+      let opponent;
+      if (player === game.player[0]) {
+        opponent = game.player[1];
+      } else {
+        opponent = game.player[0];
+      }
+      io.to(opponent.id).emit("won");
       io.to(player.id).emit("lost");
 
       // stop game
@@ -294,9 +335,9 @@ function correctMovement(game, player, data) {
 function checkHits(game, player) {
   if (
     // check for borders
-    player.x < grid.x ||
+    player.x < 0 ||
     player.x >= grid.width * grid.fieldSize ||
-    player.y < grid.y ||
+    player.y < 0 ||
     player.y >= grid.height * grid.fieldSize ||
     // check for snake hit
     game.player[0].body.includes([player.x, player.y]) ||
@@ -326,7 +367,7 @@ function updatePlayer(game) {
   let data = {
     p1: game.player[0],
     p2: game.player[1],
-    timestamp: new Date().getTime() - game.starttime
+    time: new Date().getTime() - game.starttime
   };
   io.in("game-" + game.index).emit("playerupdate", data);
 }
