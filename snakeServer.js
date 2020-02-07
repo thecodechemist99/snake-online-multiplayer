@@ -136,6 +136,11 @@ function newGame(socket) {
     resetGame(socket, game, id);
   });
 
+  socket.on("disconnect", () => {
+    console.log("Player " + socket.id + " disconnected.");
+    resetGame(socket, game);
+  });
+
   /* movement */
 
   // change direction
@@ -153,75 +158,117 @@ function timeGame(game) {
   updatePlayer(game);
 }
 
+// function resetGame(socket, game) {
+//   let player1 = game.player[0];
+//   let player2 = game.player[1];
+
+//   // reset player objects
+//   player1.length = 0;
+//   player1.score = 0;
+//   player2.length = 0;
+//   player2.score = 0;
+//   updatePlayer(game);
+
+//   // put player back to queue
+//   queue.push(game.player.pop());
+//   queue.push(game.player.pop());
+
+//   console.log("Player " + player1.id + " left the game.");
+//   console.log("Player " + player2.id + " left the game.");
+
+//   // delete game as both player left
+//   games.splice(game.index, 1);
+//   console.log("Game deleted, both player left.");
+
+//   console.log("Player " + player1.id + " in queue.");
+//   console.log("Player " + player2.id + " in queue.");
+
+//   if (queue.length >= 2) {
+//     newGame(socket);
+//   }
+// }
+
 function resetGame(socket, game) {
-  let player1 = game.player[0];
-  let player2 = game.player[1];
+  /* reset game on disconect */
 
-  // reset player objects
-  player1.length = 0;
-  player1.score = 0;
-  player2.length = 0;
-  player2.score = 0;
-  updatePlayer(game);
+  let playerIndex;
+  let player2;
+  if (game.player.length === 2) {
+    if (socket.id === game.player[0].id) {
+      playerIndex = 0;
+      player2 = game.player[1];
+    } else {
+      playerIndex = 1;
+      player2 = game.player[0];
+    }
+    // delete player object
+    game.player.splice(playerIndex, 1);
 
-  // put player back to queue
-  queue.push(game.player.pop());
-  queue.push(game.player.pop());
+    // put other player back to queue
+    queue.push(player2);
+    if (playerIndex === 0) {
+      game.player.splice(1, 1);
+    } else {
+      game.player.splice(0, 1);
+    }
+    console.log("Player " + player2.id + " left the game.");
+  } else {
+    game.player.pop();
+  }
 
-  console.log("Player " + player1.id + " left the game.");
-  console.log("Player " + player2.id + " left the game.");
-
-  // delete game as both player left
+  // delete game
   games.splice(game.index, 1);
   console.log("Game deleted, both player left.");
 
-  console.log("Player " + player1.id + " in queue.");
-  console.log("Player " + player2.id + " in queue.");
+  if (player2) {
+    console.log("Player " + player2.id + " in queue.");
+  }
 
   if (queue.length >= 2) {
     newGame(socket);
   }
 }
 
-// function resetGame(socket, game, playerId) {
-//   // set vars
-//   let playerIndex;
-//   let player;
-//   if (game.player.length === 2) {
-//     if (playerId === game.player[0].id) {
-//       playerIndex = 0;
-//     } else {
-//       playerIndex = 1;
-//     }
-//     player = game.player[playerIndex];
-//   } else {
-//     player = game.player[0];
-//   }
+function resetGame(socket, game, playerId) {
+  /* reset game on client input */
 
-//   // reset player object
-//   player.length = 0;
-//   player.score = 0;
-//   updatePlayer(game);
+  let playerIndex;
+  let player;
+  if (game.player.length === 2) {
+    if (playerId === game.player[0].id) {
+      playerIndex = 0;
+    } else {
+      playerIndex = 1;
+    }
+    player = game.player[playerIndex];
+  } else {
+    player = game.player[0];
+  }
 
-//   // put player back to queue
-//   queue.push(player);
-//   game.player.splice(playerIndex, 1);
+  // reset player object
+  player.length = 0;
+  player.score = 0;
+  updatePlayer(game);
 
-//   console.log("Player " + playerId + " left the game.");
+  // put player back to queue
+  queue.push(player);
+  game.player.splice(playerIndex, 1);
 
-//   // delete game if both player left
-//   if (game.player.length === 0) {
-//     games.splice(game.index, 1);
+  console.log("Player " + playerId + " left the game.");
 
-//     console.log("Game deleted, both player left.");
-//   }
+  // delete game if both player left
+  if (game.player.length === 0) {
+    games.splice(game.index, 1);
 
-//   console.log("Player " + playerId + " in queue.");
+    console.log("Game deleted, both player left.");
+  }
 
-//   if (queue.length >= 2) {
-//     newGame(socket);
-//   }
-// }
+  console.log("Player " + playerId + " in queue.");
+
+  if (queue.length >= 2) {
+    newGame(socket);
+  }
+}
 
 /* movement */
 

@@ -7,7 +7,7 @@ Online multiplayer snake game client.
 
 let socket;
 let socketId;
-socket = io.connect("http://snake-online-multiplayer.herokuapp.com");
+socket = io.connect("https://snake-online-multiplayer.herokuapp.com/");
 
 socket.on("sendid", getClientId);
 
@@ -15,7 +15,7 @@ function getClientId(id) {
   socketId = id;
 
   console.log(
-    "You have successfully been connected to the server at http://snake-online-multiplayer.herokuapp.com.\nYour player ID is " +
+    "You have successfully been connected to the server at https://snake-online-multiplayer.herokuapp.com/.\nYour player ID is " +
       socketId +
       "."
   );
