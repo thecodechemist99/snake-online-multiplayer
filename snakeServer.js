@@ -92,9 +92,6 @@ function newConnection(socket) {
 
   // reset game
   socket.on("reset", id => {
-    console.log("Player ID: " + id);
-    console.log("Socket ID: " + socket.id);
-
     let game = games[getGameIndex(id)];
     resetGame(game, id);
   });
