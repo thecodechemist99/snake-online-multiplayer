@@ -111,7 +111,9 @@ function newConnection(socket) {
   // change direction
   socket.on("keyinput", data => {
     let game = games[getGameIndex(data.id)];
-    updateDir(game, data);
+    if (game.run) {
+      updateDir(game, data);
+    }
   });
 }
 
