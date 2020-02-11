@@ -16,7 +16,7 @@ const port = process.env.PORT || 3000;
 let server = app.listen(port);
 app.use(express.static("public"));
 
-console.log("Socket server listening on port 3000 ...");
+console.log("Socket server listening on port " + port + " ...");
 
 /* === setup websocket connection === */
 
@@ -85,13 +85,39 @@ function newConnection(socket) {
 
   // create new game if 2 player in queue
   if (queue.length >= 2) {
-    newGame(socket);
+    newGame();
   }
+
+  /* == game based input == */
+
+  // reset game
+  socket.on("reset", id => {
+    console.log("Player ID: " + id);
+    console.log("Socket ID: " + socket.id);
+
+    let game = games[getGameIndex(id)];
+    resetGame(game, id);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("Player " + socket.id + " disconnected.");
+
+    let game = games[getGameIndex(socket.id)];
+    resetGameOnDisconnect(socket, game);
+  });
+
+  /* movement */
+
+  // change direction
+  socket.on("keyinput", data => {
+    let game = games[getGameIndex(data.id)];
+    updateDir(game, data);
+  });
 }
 
 /* == game == */
 
-function newGame(socket) {
+function newGame() {
   // add last 2 player in queue to new game
   let game = new Game(
     (this.starttime = new Date().getTime()),
@@ -128,25 +154,6 @@ function newGame(socket) {
   game.gameTimer = setInterval(() => {
     timeGame(game);
   }, moveInt);
-
-  // reset game
-  socket.on("reset", id => {
-    console.log("Player ID: " + id);
-    console.log("Socket ID: " + socket.id);
-    resetGame(socket, game, id);
-  });
-
-  socket.on("disconnect", () => {
-    console.log("Player " + socket.id + " disconnected.");
-    resetGame(socket, game);
-  });
-
-  /* movement */
-
-  // change direction
-  socket.on("keyinput", data => {
-    updateDir(game, data);
-  });
 }
 
 function timeGame(game) {
@@ -158,37 +165,21 @@ function timeGame(game) {
   updatePlayer(game);
 }
 
-// function resetGame(socket, game) {
-//   let player1 = game.player[0];
-//   let player2 = game.player[1];
+function getGameIndex(playerId) {
+  let gameIndex;
+  for (let i = 0; i < games.length; i++) {
+    if (
+      games[i].player[0].id === playerId ||
+      games[i].player[1].id === playerId
+    ) {
+      gameIndex = i;
+      break;
+    }
+  }
+  return gameIndex;
+}
 
-//   // reset player objects
-//   player1.length = 0;
-//   player1.score = 0;
-//   player2.length = 0;
-//   player2.score = 0;
-//   updatePlayer(game);
-
-//   // put player back to queue
-//   queue.push(game.player.pop());
-//   queue.push(game.player.pop());
-
-//   console.log("Player " + player1.id + " left the game.");
-//   console.log("Player " + player2.id + " left the game.");
-
-//   // delete game as both player left
-//   games.splice(game.index, 1);
-//   console.log("Game deleted, both player left.");
-
-//   console.log("Player " + player1.id + " in queue.");
-//   console.log("Player " + player2.id + " in queue.");
-
-//   if (queue.length >= 2) {
-//     newGame(socket);
-//   }
-// }
-
-function resetGame(socket, game) {
+function resetGameOnDisconnect(socket, game) {
   /* reset game on disconect */
 
   let playerIndex;
@@ -225,11 +216,11 @@ function resetGame(socket, game) {
   }
 
   if (queue.length >= 2) {
-    newGame(socket);
+    newGame();
   }
 }
 
-function resetGame(socket, game, playerId) {
+function resetGame(game, playerId) {
   /* reset game on client input */
 
   let playerIndex;
@@ -266,7 +257,7 @@ function resetGame(socket, game, playerId) {
   console.log("Player " + playerId + " in queue.");
 
   if (queue.length >= 2) {
-    newGame(socket);
+    newGame();
   }
 }
 
