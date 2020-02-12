@@ -87,9 +87,7 @@ function newConnection(socket) {
 
   // create new game if 2 player in queue
   if (queue.length >= 2) {
-    console.log("Lobby vor neuem Spiel: " + queue);
     newGame();
-    console.log("Lobby nachdem neues Spiel erstellt: " + queue);
   }
 
   /* == game based input == */
@@ -97,9 +95,11 @@ function newConnection(socket) {
   // reset game
   socket.on("reset", id => {
     let game = games[getGameIndex(id)];
-    let index = game.index;
-    resetGame(game, id);
-    socket.leave("game-" + index);
+    if (game != undefined) {
+      let index = game.index;
+      resetGame(game, id);
+      socket.leave("game-" + index);
+    }
   });
 
   socket.on("disconnect", () => {
@@ -184,23 +184,32 @@ function newGame() {
 }
 
 function timeGame(game) {
-  // calc snake movement
-  calcSnakeMovement(game, game.player[0]);
-  calcSnakeMovement(game, game.player[1]);
+  if (game.player.length > 1) {
+    // calc snake movement
+    calcSnakeMovement(game, game.player[0]);
+    calcSnakeMovement(game, game.player[1]);
 
-  // update player
-  updatePlayer(game);
+    // update player
+    updatePlayer(game);
+  }
 }
 
 function getGameIndex(playerId) {
   let gameIndex;
   for (let i = 0; i < games.length; i++) {
-    if (
-      games[i].player[0].id === playerId ||
-      games[i].player[1].id === playerId
-    ) {
-      gameIndex = i;
-      break;
+    if (games[i].player.length > 1) {
+      if (
+        games[i].player[0].id === playerId ||
+        games[i].player[1].id === playerId
+      ) {
+        gameIndex = i;
+        break;
+      }
+    } else {
+      if (games[i].player[0].id === playerId) {
+        gameIndex = i;
+        break;
+      }
     }
   }
   return gameIndex;
