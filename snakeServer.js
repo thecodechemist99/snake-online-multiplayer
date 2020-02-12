@@ -83,11 +83,13 @@ function newConnection(socket) {
     )
   );
 
-  console.log("New player with ID " + socket.id + "connected.");
+  console.log("New player with ID " + socket.id + " connected.");
 
   // create new game if 2 player in queue
   if (queue.length >= 2) {
+    console.log("Lobby vor neuem Spiel: " + queue);
     newGame();
+    console.log("Lobby nachdem neues Spiel erstellt: " + queue);
   }
 
   /* == game based input == */
@@ -104,11 +106,15 @@ function newConnection(socket) {
     console.log("Player " + socket.id + " disconnected.");
 
     let game = games[getGameIndex(socket.id)];
-    let index = game.index;
-    resetGameOnDisconnect(socket, game);
-    socket.leave("game-" + index);
+    if (game != undefined) {
+      let index = game.index;
+      resetGameOnDisconnect(socket, game);
+      socket.leave("game-" + index);
+    } else {
+      queue.splice(0, 1);
+    }
 
-    // delete user from users
+    // delete user from user array
     let userIndex = users.findIndex(user => user.id === socket.id);
     users.splice(userIndex, 1);
   });
