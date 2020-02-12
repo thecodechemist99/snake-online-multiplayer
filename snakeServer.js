@@ -23,6 +23,8 @@ console.log("Socket server listening on port " + port + " ...");
 let socket = require("socket.io");
 let io = socket(server);
 
+let users = [];
+
 /* === setup game === */
 
 const grid = { x: 30, y: 50, width: 60, height: 40, fieldSize: 15 };
@@ -46,6 +48,9 @@ io.sockets.on("connection", newConnection);
 
 function newConnection(socket) {
   /* == general communication == */
+
+  // save socket to user array
+  users.push({ socket: socket, id: socket.id });
 
   // send socket id
   let id = socket.id;
@@ -102,6 +107,10 @@ function newConnection(socket) {
     let index = game.index;
     resetGameOnDisconnect(socket, game);
     socket.leave("game-" + index);
+
+    // delete user from users
+    let userIndex = users.findIndex(user => user.id === socket.id);
+    users.splice(userIndex, 1);
   });
 
   /* movement */
@@ -132,8 +141,12 @@ function newGame() {
 
   // join game room
   let room = "game-" + game.index;
-  let socket1 = player1.socket;
-  let socket2 = player2.socket;
+
+  let player1_index = users.findIndex(user => user.id === player1.id);
+  let player2_index = users.findIndex(user => user.id === player2.id);
+
+  let socket1 = users[player1_index].socket;
+  let socket2 = users[player2_index].socket;
 
   socket1.join(room);
   socket2.join(room);
