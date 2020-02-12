@@ -45,10 +45,6 @@ let moveInt = 100;
 io.sockets.on("connection", newConnection);
 
 function newConnection(socket) {
-  // join room
-  let room = "game-" + games.length;
-  socket.join(room);
-
   /* == general communication == */
 
   // send socket id
@@ -81,7 +77,7 @@ function newConnection(socket) {
     )
   );
 
-  console.log("New player with ID " + socket.id + " joined room " + room + ".");
+  console.log("New player with ID " + socket.id + "connected.");
 
   // create new game if 2 player in queue
   if (queue.length >= 2) {
@@ -93,14 +89,18 @@ function newConnection(socket) {
   // reset game
   socket.on("reset", id => {
     let game = games[getGameIndex(id)];
+    let index = game.index;
     resetGame(game, id);
+    socket.leave("game-" + index);
   });
 
   socket.on("disconnect", () => {
     console.log("Player " + socket.id + " disconnected.");
 
     let game = games[getGameIndex(socket.id)];
+    let index = game.index;
     resetGameOnDisconnect(socket, game);
+    socket.leave("game-" + index);
   });
 
   /* movement */
@@ -124,6 +124,10 @@ function newGame() {
   );
   games.push(game);
   game.index = games.length - 1;
+
+  // join game room
+  let room = "game-" + game.index;
+  socket.join(room);
 
   // set player vars
   let player1 = game.player[0];
@@ -178,6 +182,12 @@ function getGameIndex(playerId) {
   return gameIndex;
 }
 
+function recalcGameIndices() {
+  for (let i = 0; i < games.length; i++) {
+    games[i].index = i;
+  }
+}
+
 function resetGameOnDisconnect(socket, game) {
   /* reset game on disconect */
 
@@ -208,6 +218,7 @@ function resetGameOnDisconnect(socket, game) {
 
   // delete game
   games.splice(game.index, 1);
+  recalcGameIndices();
   console.log("Game deleted, both player left.");
 
   if (player2) {
@@ -249,7 +260,7 @@ function resetGame(game, playerId) {
   // delete game if both player left
   if (game.player.length === 0) {
     games.splice(game.index, 1);
-
+    recalcGameIndices();
     console.log("Game deleted, both player left.");
   }
 
@@ -332,26 +343,76 @@ function updateDir(game, data) {
 }
 
 function correctMovement(game, player, data) {
-  // get timestamp
   let timestamp = new Date().getTime() - game.starttime;
-  // calc dir change
   let newDir = data.dir;
+
   // check for time offset
   let timeDiff = timestamp - data.time;
   let index = Math.abs(Math.ceil(timeDiff / moveInt));
+
   if (timeDiff > moveInt) {
     // correct movement
-    deleted = player.body.splice(player.body.length - index, index);
+    if (index <= player.length) {
+      player.body.splice(player.body.length - index, index);
 
-    player.x = player.body[player.body.length - 1][0];
-    player.y = player.body[player.body.length - 1][1];
-    player.body.pop();
+      player.x = player.body[player.body.length - 1][0];
+      player.y = player.body[player.body.length - 1][1];
+      player.body.pop();
 
-    // apply dir change
-    player.moveDir = newDir;
+      // apply dir change
+      player.moveDir = newDir;
 
-    for (let i = 0; i < index + 1; i++) {
-      calcSnakeMovement(game, player);
+      for (let i = 0; i < index + 1; i++) {
+        calcSnakeMovement(game, player);
+      }
+    } else {
+      // calc diff between last snake segment and turning point
+      let delta = (index - player.length + 1) * grid.fieldSize;
+
+      // correct snake pos
+      let dX = 0;
+      let dY = 0;
+      switch (player.moveDir) {
+        case 0:
+          dY += delta;
+          break;
+        case 1:
+          dX -= delta;
+          break;
+        case 2:
+          dY -= delta;
+          break;
+        case 3:
+          dX += delta;
+          break;
+      }
+
+      switch (newDir) {
+        case 0:
+          dY += delta;
+          break;
+        case 1:
+          dX -= delta;
+          break;
+        case 2:
+          dY -= delta;
+          break;
+        case 3:
+          dX += delta;
+          break;
+      }
+
+      // apply new snake pos
+      player.x = player.body[0][0] + dX;
+      player.y = player.body[0][1] + dY;
+
+      // delete old body
+      player.body = [];
+
+      // move snake
+      for (let i = 0; i < player.length; i++) {
+        calcSnakeMovement(game, player);
+      }
     }
   } else if (timeDiff < -moveInt) {
     for (let i = 0; i < index + 1; i++) {
