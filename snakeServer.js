@@ -68,6 +68,7 @@ function newConnection(socket) {
   queue.push(
     new Player(
       (this.id = socket.id),
+      (this.socket = socket),
       (this.x =
         Math.floor(Math.random() * (grid.width / 2) + grid.width / 4) *
         grid.fieldSize),
@@ -125,13 +126,17 @@ function newGame() {
   games.push(game);
   game.index = games.length - 1;
 
-  // join game room
-  let room = "game-" + game.index;
-  socket.join(room);
-
   // set player vars
   let player1 = game.player[0];
   let player2 = game.player[1];
+
+  // join game room
+  let room = "game-" + game.index;
+  let socket1 = player1.socket;
+  let socket2 = player2.socket;
+
+  socket1.join(room);
+  socket2.join(room);
 
   console.log(
     "Player " + player1.id + " and player " + player2.id + " joined a new game."
