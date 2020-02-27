@@ -234,10 +234,13 @@ function resetGameOnDisconnect(socket, game) {
       playerIndex = 1;
       player2 = game.player[0];
     }
+
     // delete player object
     game.player.splice(playerIndex, 1);
 
-    // put other player back to queue
+    // reset other player and put back to queue
+    player2.reset();
+
     queue.push(player2);
     if (playerIndex === 0) {
       game.player.splice(1, 1);
@@ -280,8 +283,7 @@ function resetGame(game, playerId) {
   }
 
   // reset player object
-  player.length = 0;
-  player.score = 0;
+  player.reset();
   updatePlayer(game);
 
   // put player back to queue
