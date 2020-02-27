@@ -450,7 +450,6 @@ function correctMovement(game, player, data) {
   } else if (timeDiff < -moveInt) {
     for (let i = 0; i < index + 1; i++) {
       calcSnakeMovement(game, player);
-      added.push(player.body[player.body.length - 1]);
     }
 
     // apply dir change
