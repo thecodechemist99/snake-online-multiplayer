@@ -22,6 +22,13 @@ class Player {
       Math.floor(Math.random() * (grid.height / 2) + grid.height / 4) *
       grid.fieldSize;
   }
+
+  reset() {
+    this.body = [];
+    this.length = 0;
+    this.moveDir = Math.floor(Math.random(4));
+    this.score = 0;
+  }
 }
 
 module.exports = Player;
