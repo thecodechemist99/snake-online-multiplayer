@@ -93,7 +93,7 @@ function newConnection(socket) {
   /* == game based input == */
 
   // reset game
-  socket.on("reset", id => {
+  socket.on("reset", (id) => {
     let game = games[getGameIndex(id)];
     if (game != undefined) {
       let index = game.index;
@@ -115,14 +115,14 @@ function newConnection(socket) {
     }
 
     // delete user from user array
-    let userIndex = users.findIndex(user => user.id === socket.id);
+    let userIndex = users.findIndex((user) => user.id === socket.id);
     users.splice(userIndex, 1);
   });
 
   /* movement */
 
   // change direction
-  socket.on("keyinput", data => {
+  socket.on("keyinput", (data) => {
     let game = games[getGameIndex(data.id)];
     if (game.run) {
       updateDir(game, data);
@@ -148,11 +148,11 @@ function newGame() {
   // join game room
   let room = "game-" + game.index;
 
-  let player1_index = users.findIndex(user => user.id === player1.id);
-  let player2_index = users.findIndex(user => user.id === player2.id);
+  let player1_index = users.findIndex((user) => user.id === player1.id);
+  let player2_index = users.findIndex((user) => user.id === player2.id);
 
   let socket1 = users[player1_index].socket;
-  let socket2 = users[player2_index].socket;
+  let socket2 = users < [player2_index].socket;
 
   socket1.join(room);
   socket2.join(room);
@@ -171,7 +171,7 @@ function newGame() {
     game: game,
     p1: player1,
     p2: player2,
-    fruit: fruit
+    fruit: fruit,
   };
 
   io.to(player1.id).emit("initgame", data);
@@ -499,7 +499,7 @@ function updatePlayer(game) {
   let data = {
     p1: game.player[0],
     p2: game.player[1],
-    time: new Date().getTime() - game.starttime
+    time: new Date().getTime() - game.starttime,
   };
   io.in("game-" + game.index).emit("playerupdate", data);
 }
