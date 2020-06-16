@@ -3,7 +3,7 @@
   <head>
     <title>Snake - Online Multiplayer Game</title>
     <meta charset="utf-8" />
-    <link rel="stylesheet" type="text/css" href="css/style.css" />
+    <link rel="stylesheet" type="text/css" href="style.css" />
 
     <!-- reference socket.io library -->
     <script src="https://cdn.jsdelivr.net/npm/socket.io-client@2/dist/socket.io.js"></script>
@@ -11,14 +11,14 @@
     <!-- reference p5.js library -->
     <script src="https://cdn.jsdelivr.net/npm/p5@0.10.2/lib/p5.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/p5@0.10.2/lib/addons/p5.sound.js"></script>
-    <script src="script/p5setup.js"></script>
+    <script src="src/p5setup.js"></script>
   </head>
   <body>
     <div id="arcade">
-      <img src="images/arcade.svg" alt="Arcadeautomat" />
+      <img src="img/arcade.svg" alt="Arcadeautomat" />
     </div>
     <div id="screen">
-      <script src="script/snake.js"></script>
+      <script type="module" src="src/client.js"></script>
     </div>
   </body>
 </html>
